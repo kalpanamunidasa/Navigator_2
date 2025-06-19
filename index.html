@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>GPS Parking Navigator Demo</title>
+<style>
+  body {
+    background: black;
+    color: white;
+    font-family: monospace, monospace;
+    padding: 20px;
+    text-align: center;
+  }
+  #status {
+    margin: 20px 0;
+    font-size: 1.2em;
+  }
+  #instruction {
+    font-size: 1.8em;
+    font-weight: bold;
+    margin-top: 30px;
+  }
+  button {
+    padding: 12px 20px;
+    font-size: 16px;
+    margin-top: 20px;
+    cursor: pointer;
+    border-radius: 6px;
+    border: none;
+    background-color: #00c3ff;
+    color: black;
+    font-weight: bold;
+  }
+</style>
+</head>
+<body>
+
+<h1>📍 GPS Parking Navigator Demo</h1>
+<div id="status">Waiting for GPS permission and position...</div>
+
+<div id="coords"></div>
+
+<div id="instruction">Select a slot to start</div>
+
+<button onclick="startNavigation()">Start Navigation</button>
+
+<script>
+  // Replace these with your real GPS step coordinates and instructions
+  const steps = [
+    { lat: 6.900000, lng: 79.860000, instruction: "Go straight 50cm" },
+    { lat: 6.900005, lng: 79.860010, instruction: "Turn right" },
+    { lat: 6.900010, lng: 79.860020, instruction: "Go straight 60cm" },
+    { lat: 6.900015, lng: 79.860025, instruction: "Turn left and park" }
+  ];
+
+  let currentStep = 0;
+  let watchId = null;
+
+  const statusDiv = document.getElementById('status');
+  const coordsDiv = document.getElementById('coords');
+  const instructionDiv = document.getElementById('instruction');
+
+  // Calculate distance between two GPS points (in meters)
+  function distanceInMeters(lat1, lon1, lat2, lon2) {
+    const R = 6371000; // Earth radius in meters
+    const toRad = deg => deg * Math.PI / 180;
+    const dLat = toRad(lat2 - lat1);
+    const dLon = toRad(lon2 - lon1);
+    const a = Math.sin(dLat/2) * Math.sin(dLat/2) +
+              Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) *
+              Math.sin(dLon/2) * Math.sin(dLon/2);
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+    return R * c;
+  }
+
+  function startNavigation() {
+    if (!navigator.geolocation) {
+      alert("Geolocation is not supported by your browser");
+      return;
+    }
+    currentStep = 0;
+    instructionDiv.textContent = "Starting navigation...";
+    statusDiv.textContent = "Waiting for GPS position...";
+
+    // Start watching position
+    watchId = navigator.geolocation.watchPosition(position => {
+      const lat = position.coords.latitude;
+      const lng = position.coords.longitude;
+      const accuracy = position.coords.accuracy;
+
+      statusDiv.textContent = `Current Position: ${lat.toFixed(6)}, ${lng.toFixed(6)} (accuracy: ${accuracy} m)`;
+      coordsDiv.textContent = `Step ${currentStep + 1} target: ${steps[currentStep].lat}, ${steps[currentStep].lng}`;
+
+      const dist = distanceInMeters(lat, lng, steps[currentStep].lat, steps[currentStep].lng);
+
+      if (dist < 5) { // within 5 meters threshold
+        instructionDiv.textContent = steps[currentStep].instruction;
+        currentStep++;
+
+        if (currentStep >= steps.length) {
+          instructionDiv.textContent = "🎉 You have arrived at your parking slot!";
+          navigator.geolocation.clearWatch(watchId);
+          watchId = null;
+        }
+      } else {
+        instructionDiv.textContent = `Move closer to: "${steps[currentStep].instruction}" (${dist.toFixed(1)} meters away)`;
+      }
+
+    }, error => {
+      statusDiv.textContent = `Error getting position: ${error.message}`;
+    }, {
+      enableHighAccuracy: true,
+      maximumAge: 1000,
+      timeout: 10000
+    });
+  }
+</script>
+
+</body>
+</html>
